@@ -49,9 +49,9 @@ const DonorProfile = Record({
 
 // Donor Status Enum
 const DonorStatus = Variant({
-  Active: text,
-  Inactive: text,
-  Suspended: text,
+  Active: Null,
+  Inactive: Null,
+  Suspended: Null,
 });
 
 // Charity Profile Struct
@@ -72,11 +72,11 @@ const Charity = Record({
 
 // Campaign Status Enum
 const CampaignStatus = Variant({
-  Active: text,
-  Accepted: text,
-  Completed: text,
-  Cancelled: text,
-  Pending: text,
+  Active: Null,
+  Accepted: Null,
+  Completed: Null,
+  Cancelled: Null,
+  Pending: Null,
 });
 
 // Campaign Struct
@@ -95,12 +95,12 @@ const Campaign = Record({
 
 // Donation Status Enum
 const DonationStatus = Variant({
-  PaymentPending: text,
-  Completed: text,
-  Cancelled: text,
+  PaymentPending: Null,
+  Completed: Null,
+  Cancelled: Null,
 });
 
-// Donation Reserve Struct
+// Donation Struct
 const Donation = Record({
   id: text,
   donorId: text,
@@ -115,11 +115,11 @@ const Donation = Record({
   memo: nat64,
 });
 
-// Donationation Report enum
+// Donation Report Status Enum
 const DonationReportStatus = Variant({
-  Pending: text,
-  Completed: text,
-  Cancelled: text,
+  Pending: Null,
+  Completed: Null,
+  Cancelled: Null,
 });
 
 // Donation Report Struct
@@ -200,8 +200,8 @@ const donationReportStorage = StableBTreeMap(5, text, DonationReport);
 const TIMEOUT_PERIOD = 9600n; // reservation period in seconds
 
 /* 
-    initialization of the Ledger canister. The principal text value is hardcoded because 
-    we set it in the `dfx.json`
+    Initialization of the Ledger canister. The principal text value is hardcoded because 
+    we set it in the `dfx.json`.
 */
 const icpCanister = Ledger(Principal.fromText("ryjl3-tyaaa-aaaaa-aaaba-cai"));
 
@@ -214,12 +214,7 @@ export default Canister({
     Result(DonorProfile, Message),
     (payload) => {
       // Validate the payload
-      if (
-        !payload.name ||
-        !payload.email ||
-        !payload.phoneNumber ||
-        !payload.address
-      ) {
+      if (!payload.name || !payload.email || !payload.phoneNumber || !payload.address) {
         return Err({ InvalidPayload: "Missing required fields" });
       }
 
@@ -230,10 +225,7 @@ export default Canister({
       }
 
       // Validation for unique email check
-      const donorProfiles = donorProfileStorage.values();
-      const emailExists = donorProfiles.some(
-        (profile) => profile.email === payload.email
-      );
+      const emailExists = donorProfileStorage.values().some((profile) => profile.email === payload.email);
       if (emailExists) {
         return Err({ InvalidPayload: "Email already exists" });
       }
@@ -262,13 +254,13 @@ export default Canister({
     (donorId, payload) => {
       const donorProfileOpt = donorProfileStorage.get(donorId);
 
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Donor profile with id=${donorId} not found`,
         });
       }
 
-      const donorProfile = donorProfileOpt.Some;
+      const donorProfile = donorProfileOpt.unwrap();
 
       // Check if the caller is the owner of the donor profile
       if (donorProfile.owner !== ic.caller()) {
@@ -293,29 +285,29 @@ export default Canister({
     (donorId) => {
       const donorProfileOpt = donorProfileStorage.get(donorId);
 
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Donor profile with id=${donorId} not found`,
         });
       }
 
-      return Ok(donorProfileOpt.Some);
+      return Ok(donorProfileOpt.unwrap());
     }
   ),
 
   // Function to get a Donor Profile by Owner Principal using filter
   getDonorProfileByOwner: query([], Result(DonorProfile, Message), () => {
-    const donorProfiles = donorProfileStorage.values().filter((donor) => {
-      return donor.owner.toText === ic.caller().toText;
-    });
+    const donorProfileOpt = donorProfileStorage
+      .values()
+      .find((donor) => donor.owner.toText() === ic.caller().toText());
 
-    if (donorProfiles.length === 0) {
+    if (!donorProfileOpt) {
       return Err({
         NotFound: `Donor profile for owner=${ic.caller()} not found`,
       });
     }
 
-    return Ok(donorProfiles[0]);
+    return Ok(donorProfileOpt);
   }),
 
   // Function to get all Donor Profiles with error handling
@@ -330,17 +322,17 @@ export default Canister({
     return Ok(donorProfiles);
   }),
 
-  // Funtion to delete a Donor Profile
+  // Function to delete a Donor Profile
   deleteDonorProfile: update([text], Result(Null, Message), (donorId) => {
     const donorProfileOpt = donorProfileStorage.get(donorId);
 
-    if ("None" in donorProfileOpt) {
+    if (donorProfileOpt.isNone()) {
       return Err({
         NotFound: `Donor profile with id=${donorId} not found`,
       });
     }
 
-    const donorProfile = donorProfileOpt.Some;
+    const donorProfile = donorProfileOpt.unwrap();
 
     // Check if the caller is the owner of the donor profile
     if (donorProfile.owner !== ic.caller()) {
@@ -358,13 +350,7 @@ export default Canister({
     Result(Charity, Message),
     (payload) => {
       // Validate the payload
-      if (
-        !payload.name ||
-        !payload.email ||
-        !payload.phoneNumber ||
-        !payload.address ||
-        !payload.missionStatement
-      ) {
+      if (!payload.name || !payload.email || !payload.phoneNumber || !payload.address || !payload.missionStatement) {
         return Err({ InvalidPayload: "Missing required fields" });
       }
 
@@ -375,10 +361,7 @@ export default Canister({
       }
 
       // Validation for unique email check
-      const charityProfiles = charityProfileStorage.values();
-      const emailExists = charityProfiles.some(
-        (profile) => profile.email === payload.email
-      );
+      const emailExists = charityProfileStorage.values().some((profile) => profile.email === payload.email);
       if (emailExists) {
         return Err({ InvalidPayload: "Email already exists" });
       }
@@ -411,13 +394,13 @@ export default Canister({
     (charityId, payload) => {
       const charityProfileOpt = charityProfileStorage.get(charityId);
 
-      if ("None" in charityProfileOpt) {
+      if (charityProfileOpt.isNone()) {
         return Err({
           NotFound: `Charity profile with id=${charityId} not found`,
         });
       }
 
-      const charityProfile = charityProfileOpt.Some;
+      const charityProfile = charityProfileOpt.unwrap();
 
       // Check if the caller is the owner of the charity profile
       if (charityProfile.owner !== ic.caller()) {
@@ -442,29 +425,29 @@ export default Canister({
     (charityId) => {
       const charityProfileOpt = charityProfileStorage.get(charityId);
 
-      if ("None" in charityProfileOpt) {
+      if (charityProfileOpt.isNone()) {
         return Err({
           NotFound: `Charity profile with id=${charityId} not found`,
         });
       }
 
-      return Ok(charityProfileOpt.Some);
+      return Ok(charityProfileOpt.unwrap());
     }
   ),
 
   // Function to get a Charity Profile by Owner Principal using filter
   getCharityProfileByOwner: query([], Result(Charity, Message), () => {
-    const charityProfiles = charityProfileStorage.values().filter((charity) => {
-      return charity.owner.toText === ic.caller().toText;
-    });
+    const charityProfileOpt = charityProfileStorage
+      .values()
+      .find((charity) => charity.owner.toText() === ic.caller().toText());
 
-    if (charityProfiles.length === 0) {
+    if (!charityProfileOpt) {
       return Err({
         NotFound: `Charity profile for owner=${ic.caller()} not found`,
       });
     }
 
-    return Ok(charityProfiles[0]);
+    return Ok(charityProfileOpt);
   }),
 
   // Function to get all Charity Profiles with error handling
@@ -479,17 +462,17 @@ export default Canister({
     return Ok(charityProfiles);
   }),
 
-  // Funtion to delete a Charity Profile
+  // Function to delete a Charity Profile
   deleteCharityProfile: update([text], Result(Null, Message), (charityId) => {
     const charityProfileOpt = charityProfileStorage.get(charityId);
 
-    if ("None" in charityProfileOpt) {
+    if (charityProfileOpt.isNone()) {
       return Err({
         NotFound: `Charity profile with id=${charityId} not found`,
       });
     }
 
-    const charityProfile = charityProfileOpt.Some;
+    const charityProfile = charityProfileOpt.unwrap();
 
     // Check if the caller is the owner of the charity profile
     if (charityProfile.owner !== ic.caller()) {
@@ -514,7 +497,7 @@ export default Canister({
 
       // Check if the charity exists
       const charityProfileOpt = charityProfileStorage.get(payload.charityId);
-      if ("None" in charityProfileOpt) {
+      if (charityProfileOpt.isNone()) {
         return Err({
           NotFound: `Charity with id=${payload.charityId} not found`,
         });
@@ -527,7 +510,7 @@ export default Canister({
         id: campaignId,
         totalReceived: 0n,
         donors: [],
-        status: { Pending: "Pending" },
+        status: CampaignStatus.Pending,
         creator: ic.caller(),
         startedAt: new Date().toISOString(),
       };
@@ -544,13 +527,13 @@ export default Canister({
     (campaignId, payload) => {
       const campaignOpt = campaignStorage.get(campaignId);
 
-      if ("None" in campaignOpt) {
+      if (campaignOpt.isNone()) {
         return Err({
           NotFound: `Campaign with id=${campaignId} not found`,
         });
       }
 
-      const campaign = campaignOpt.Some;
+      const campaign = campaignOpt.unwrap();
 
       // Check if the caller is the creator of the campaign
       if (campaign.creator !== ic.caller()) {
@@ -572,13 +555,13 @@ export default Canister({
   getCampaignById: query([text], Result(Campaign, Message), (campaignId) => {
     const campaignOpt = campaignStorage.get(campaignId);
 
-    if ("None" in campaignOpt) {
+    if (campaignOpt.isNone()) {
       return Err({
         NotFound: `Campaign with id=${campaignId} not found`,
       });
     }
 
-    return Ok(campaignOpt.Some);
+    return Ok(campaignOpt.unwrap());
   }),
 
   // Function to get all Campaigns with error handling
@@ -597,13 +580,13 @@ export default Canister({
   deleteCampaignById: update([text], Result(Null, Message), (campaignId) => {
     const campaignOpt = campaignStorage.get(campaignId);
 
-    if ("None" in campaignOpt) {
+    if (campaignOpt.isNone()) {
       return Err({
         NotFound: `Campaign with id=${campaignId} not found`,
       });
     }
 
-    const campaign = campaignOpt.Some;
+    const campaign = campaignOpt.unwrap();
 
     // Check if the caller is the creator of the campaign
     if (campaign.creator !== ic.caller()) {
@@ -618,9 +601,7 @@ export default Canister({
   // Function to get all accepted campaigns
   getAcceptedCampaigns: query([], Result(Vec(Campaign), Message), () => {
     const campaigns = campaignStorage.values().filter((campaign) => {
-      return (
-        "Accepted" in campaign.status && campaign.status.Accepted === "Accepted"
-      );
+      return campaign.status === CampaignStatus.Accepted;
     });
 
     // Check if there are any campaigns
@@ -635,18 +616,18 @@ export default Canister({
   completeCampaign: update([text], Result(Campaign, Message), (campaignId) => {
     const campaignOpt = campaignStorage.get(campaignId);
 
-    if ("None" in campaignOpt) {
+    if (campaignOpt.isNone()) {
       return Err({
         NotFound: `Campaign with id=${campaignId} not found`,
       });
     }
 
-    const campaign = campaignOpt.Some;
+    const campaign = campaignOpt.unwrap();
 
     // Update the campaign status
     const updatedCampaign = {
       ...campaign,
-      status: { Completed: "Completed" },
+      status: CampaignStatus.Completed,
     };
     campaignStorage.insert(campaignId, updatedCampaign);
 
@@ -656,7 +637,7 @@ export default Canister({
   // Function to fetch completed campaigns
   getCompletedCampaigns: query([], Result(Vec(Campaign), Message), () => {
     const campaigns = campaignStorage.values().filter((campaign) => {
-      return campaign.status.Completed === "Completed";
+      return campaign.status === CampaignStatus.Completed;
     });
 
     // Check if there are any campaigns
@@ -673,16 +654,15 @@ export default Canister({
     Result(Vec(Campaign), Message),
     (donorId) => {
       const donorProfileOpt = donorProfileStorage.get(donorId);
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Donor with id=${donorId} not found`,
         });
       }
 
-      const donor = donorProfileOpt.Some;
-      const campaigns = campaignStorage.values().filter((campaign) => {
-        return campaign.donors.includes(donorId);
-      });
+      const campaigns = campaignStorage
+        .values()
+        .filter((campaign) => campaign.donors.includes(donorId));
 
       // Check if there are any campaigns
       if (campaigns.length === 0) {
@@ -700,7 +680,7 @@ export default Canister({
     (donorId, campaignId) => {
       // Check if the donor exists
       const donorProfileOpt = donorProfileStorage.get(donorId);
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Donor with id=${donorId} not found`,
         });
@@ -708,15 +688,15 @@ export default Canister({
 
       // Check if the campaign exists
       const campaignOpt = campaignStorage.get(campaignId);
-      if ("None" in campaignOpt) {
+      if (campaignOpt.isNone()) {
         return Err({
           NotFound: `Campaign with id=${campaignId} not found`,
         });
       }
 
       // Assuming validation passes, proceed to accept the campaign
-      const campaign = campaignOpt.Some;
-      const donor = donorProfileOpt.Some;
+      const campaign = campaignOpt.unwrap();
+      const donor = donorProfileOpt.unwrap();
 
       // Update the donor profile
       const updatedDonor = {
@@ -730,7 +710,7 @@ export default Canister({
       const updatedCampaign = {
         ...campaign,
         donors: [...campaign.donors, donorId],
-        status: { Accepted: "Accepted" },
+        status: CampaignStatus.Accepted,
       };
       campaignStorage.insert(campaignId, updatedCampaign);
 
@@ -753,30 +733,30 @@ export default Canister({
 
       // Check if the donor exists
       const donorProfileOpt = donorProfileStorage.get(payload.donorId);
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Cannot reserve donation: Donor with id=${payload.donorId} not found`,
         });
       }
-      const donor = donorProfileOpt.Some;
+      const donor = donorProfileOpt.unwrap();
 
       // Check if the charity exists
       const charityProfileOpt = charityProfileStorage.get(payload.charityId);
-      if ("None" in charityProfileOpt) {
+      if (charityProfileOpt.isNone()) {
         return Err({
           NotFound: `Cannot reserve donation: Charity with id=${payload.charityId} not found`,
         });
       }
-      const charity = charityProfileOpt.Some;
+      const charity = charityProfileOpt.unwrap();
 
       // Check if the campaign exists
       const campaignOpt = campaignStorage.get(payload.campaignId);
-      if ("None" in campaignOpt) {
+      if (campaignOpt.isNone()) {
         return Err({
           NotFound: `Cannot reserve donation: Campaign with id=${payload.campaignId} not found`,
         });
       }
-      const campaign = campaignOpt.Some;
+      const campaign = campaignOpt.unwrap();
 
       try {
         // Assuming validation passes, proceed to reserve the donation
@@ -789,7 +769,7 @@ export default Canister({
           donator: donor.owner,
           receiver: campaign.creator,
           amount: payload.amount,
-          status: { PaymentPending: "PaymentPending" },
+          status: DonationStatus.PaymentPending,
           createdAt: new Date().toISOString(),
           paid_at_block: None,
           memo: generateCorrelationId(payload.donorId), // Ensure memo is handled as nat64
@@ -830,23 +810,23 @@ export default Canister({
         });
       }
       const pendingReserveOpt = pendingReserves.remove(memo);
-      if ("None" in pendingReserveOpt) {
+      if (pendingReserveOpt.isNone()) {
         return Err({
           NotFound: `Cannot complete the donation reserve: there is no pending reserve with id=${donorId}`,
         });
       }
-      const reserve = pendingReserveOpt.Some;
+      const reserve = pendingReserveOpt.unwrap();
       const updatedReserve = {
         ...reserve,
-        status: { Completed: "COMPLETED" },
+        status: DonationStatus.Completed,
         paid_at_block: Some(block),
       };
 
       const donorProfileOpt = donorProfileStorage.get(donorId);
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         throw Error(`Donor with id=${donorId} not found`);
       }
-      const donor = donorProfileOpt.Some;
+      const donor = donorProfileOpt.unwrap();
       donor.donationAmount += reservePrice;
       donorProfileStorage.insert(donor.id, donor);
       persistedReserves.insert(ic.caller(), updatedReserve);
@@ -855,11 +835,11 @@ export default Canister({
   ),
 
   /*
-        another example of a canister-to-canister communication
-        here we call the `query_blocks` function on the ledger canister
+        Another example of a canister-to-canister communication.
+        Here we call the `query_blocks` function on the ledger canister
         to get a single block with the given number `start`.
         The `length` parameter is set to 1 to limit the return amount of blocks.
-        In this function we verify all the details about the transaction to make sure that we can mark the order as completed
+        In this function, we verify all the details about the transaction to make sure that we can mark the order as completed.
     */
   verifyPayment: query(
     [Principal, nat64, nat64, nat64],
@@ -870,9 +850,9 @@ export default Canister({
   ),
 
   /*
-              a helper function to get address from the principal
-              the address is later used in the transfer method
-          */
+    A helper function to get an address from the principal.
+    The address is later used in the transfer method.
+  */
   getAddressFromPrincipal: query([Principal], text, (principal) => {
     return hexAddressFromPrincipal(principal, 0);
   }),
@@ -894,9 +874,9 @@ export default Canister({
     [text],
     Result(Vec(Donation), Message),
     (donorId) => {
-      const donations = persistedReserves.values().filter((donation) => {
-        return donation.donorId === donorId;
-      });
+      const donations = persistedReserves
+        .values()
+        .filter((donation) => donation.donorId === donorId);
 
       // Check if there are any donations
       if (donations.length === 0) {
@@ -912,9 +892,9 @@ export default Canister({
     [text],
     Result(Vec(Donation), Message),
     (charityId) => {
-      const donations = persistedReserves.values().filter((donation) => {
-        return donation.charityId === charityId;
-      });
+      const donations = persistedReserves
+        .values()
+        .filter((donation) => donation.charityId === charityId);
 
       // Check if there are any donations
       if (donations.length === 0) {
@@ -932,19 +912,13 @@ export default Canister({
     Result(DonationReport, Message),
     (payload) => {
       // Validate the payload
-      if (
-        !payload.donorId ||
-        !payload.charityId ||
-        !payload.campaignId ||
-        !payload.campaignTitle ||
-        !payload.amount
-      ) {
+      if (!payload.donorId || !payload.charityId || !payload.campaignId || !payload.campaignTitle || !payload.amount) {
         return Err({ InvalidPayload: "Missing required fields" });
       }
 
       // Check if the donor exists
       const donorProfileOpt = donorProfileStorage.get(payload.donorId);
-      if ("None" in donorProfileOpt) {
+      if (donorProfileOpt.isNone()) {
         return Err({
           NotFound: `Cannot create donation report: Donor with id=${payload.donorId} not found`,
         });
@@ -952,7 +926,7 @@ export default Canister({
 
       // Check if the charity exists
       const charityProfileOpt = charityProfileStorage.get(payload.charityId);
-      if ("None" in charityProfileOpt) {
+      if (charityProfileOpt.isNone()) {
         return Err({
           NotFound: `Cannot create donation report: Charity with id=${payload.charityId} not found`,
         });
@@ -960,7 +934,7 @@ export default Canister({
 
       // Check if the campaign exists
       const campaignOpt = campaignStorage.get(payload.campaignId);
-      if ("None" in campaignOpt) {
+      if (campaignOpt.isNone()) {
         return Err({
           NotFound: `Cannot create donation report: Campaign with id=${payload.campaignId} not found`,
         });
@@ -971,7 +945,7 @@ export default Canister({
       const donationReport = {
         ...payload,
         id: donationReportId,
-        status: { Completed: "Completed" },
+        status: DonationReportStatus.Completed,
         createdAt: new Date().toISOString(),
         paidAt: None,
       };
@@ -980,7 +954,7 @@ export default Canister({
       return Ok(donationReport); // Successfully return the created donation report
     }
   ),
- 
+
   // Function to get all Donation Reports with error handling
   getAllDonationReports: query([], Result(Vec(DonationReport), Message), () => {
     const donationReports = donationReportStorage.values();
@@ -995,14 +969,14 @@ export default Canister({
 });
 
 /*
-    a hash function that is used to generate correlation ids for orders.
-    also, we use that in the verifyPayment function where we check if the used has actually paid the order
+    A hash function that is used to generate correlation ids for orders.
+    Also, we use that in the verifyPayment function where we check if the user has actually paid the order.
 */
 function hash(input: any): nat64 {
   return BigInt(Math.abs(hashCode().value(input)));
 }
 
-// a workaround to make uuid package work with Azle
+// A workaround to make uuid package work with Azle
 globalThis.crypto = {
   // @ts-ignore
   getRandomValues: () => {
@@ -1023,8 +997,8 @@ function generateCorrelationId(bookId: text): nat64 {
 }
 
 /*
-    after the order is created, we give the `delay` amount of minutes to pay for the order.
-    if it's not paid during this timeframe, the order is automatically removed from the pending orders.
+    After the order is created, we give the `delay` amount of minutes to pay for the order.
+    If it's not paid during this timeframe, the order is automatically removed from the pending orders.
 */
 function discardByTimeout(memo: nat64, delay: Duration) {
   ic.setTimer(delay, () => {
